@@ -2,7 +2,7 @@ import { R2Adapter, KVAdapter } from '../supabase-adapter.js';
 
 // ---- Original Helper Functions ---
 /**
- * EdgeStash - Cloudflare-based Cloud Drive
+ * Qing - Cloudflare-based Cloud Drive
  * 
  * A complete cloud storage solution built on Cloudflare Worker, R2, and KV.
  * 
@@ -1795,14 +1795,14 @@ const LOGIN_PAGE = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>登录 - EdgeStash</title>
+  <title>登录 - Qing</title>
   ${CSS_STYLES}
 </head>
 <body>
   <div class="login-container">
     <div class="login-card">
       <div class="login-header">
-        <div class="login-logo">EdgeStash</div>
+        <div class="login-logo">Qing</div>
         <div class="login-subtitle">基于 Cloudflare 的云盘服务</div>
       </div>
       
@@ -1896,14 +1896,14 @@ const INDEX_PAGE = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>EdgeStash - 云盘</title>
+  <title>Qing - 云盘</title>
   ${CSS_STYLES}
   <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mammoth@1.6.0/mammoth.browser.min.js"></script>
 </head>
 <body>
   <div class="header">
-    <div class="logo">EdgeStash</div>
+    <div class="logo">Qing</div>
     <div class="header-actions">
       <button class="btn btn-secondary" onclick="window.location.href='/admin.html'">管理后台</button>
       <button class="btn btn-secondary" onclick="logout()">退出登录</button>
@@ -2504,12 +2504,12 @@ const ADMIN_PAGE = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>管理后台 - EdgeStash</title>
+  <title>管理后台 - Qing</title>
   ${CSS_STYLES}
 </head>
 <body>
   <div class="header">
-    <div class="logo">EdgeStash 管理后台</div>
+    <div class="logo">Qing 管理后台</div>
     <div class="header-actions">
       <button class="btn btn-secondary" onclick="window.location.href='/'">返回云盘</button>
       <button class="btn btn-secondary" onclick="logout()">退出登录</button>
@@ -2873,7 +2873,7 @@ const SHARE_PAGE = `
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>文件分享 - EdgeStash</title>
+  <title>文件分享 - Qing</title>
   ${CSS_STYLES}
 </head>
 <body>

@@ -10,7 +10,7 @@ function getSupabase() {
 
 export class R2Adapter {
     constructor() {
-        this.bucket = process.env.SUPABASE_BUCKET || 'edgestash-files';
+        this.bucket = process.env.SUPABASE_BUCKET || 'qing-files';
     }
     get supabase() { return getSupabase(); }
 
