@@ -3,14 +3,16 @@ import { createClient } from '@supabase/supabase-js';
 let supabaseInstance = null;
 function getSupabase() {
     if (!supabaseInstance) {
-        supabaseInstance = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
+        let url = (process.env.SUPABASE_URL || '').trim();
+        let key = (process.env.SUPABASE_KEY || '').trim();
+        supabaseInstance = createClient(url, key);
     }
     return supabaseInstance;
 }
 
 export class R2Adapter {
     constructor() {
-        this.bucket = process.env.SUPABASE_BUCKET || 'qing-files';
+        this.bucket = (process.env.SUPABASE_BUCKET || 'qing-files').trim();
     }
     get supabase() { return getSupabase(); }
 
@@ -63,7 +65,7 @@ export class R2Adapter {
         let promise;
         if (!cleanPrefix) {
             // Retrieve root directory
-            promise = this.supabase.storage.from(this.bucket).list();
+            promise = this.supabase.storage.from(this.bucket).list('');
         } else {
             promise = this.supabase.storage.from(this.bucket).list(cleanPrefix, { limit: 1000 });
         }
@@ -71,8 +73,13 @@ export class R2Adapter {
         const { data, error } = await promise;
 
         if (error) {
-            console.error("Supabase List Error:", error);
-            throw error;
+            console.error("Supabase List Error DUMP:", error.message, error.name, error);
+            // Catch missing buckets or paths gracefully and return empty list rather than breaking UI
+            if (error.message && error.message.toLowerCase().includes("invalid")) {
+                console.log("Invalid path caught, returning empty items to prevent UI lock.");
+                return { objects: [], delimitedPrefixes: [] };
+            }
+            throw new Error(error.message || JSON.stringify(error));
         }
         if (!data) return { objects: [], delimitedPrefixes: [] };
 
