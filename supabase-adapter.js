@@ -22,7 +22,7 @@ export class R2Adapter {
             httpMetadata: { contentType: data.type }
         };
     }
-    
+
     async head(key) {
         const pathParts = key.split('/');
         const name = pathParts.pop();
@@ -31,29 +31,44 @@ export class R2Adapter {
         if (error || !data || data.length === 0) return null;
         return data.find(o => o.name === name) || null;
     }
-    
+
     async put(key, body, options) {
         let uploadBody = body;
-        if (body instanceof ReadableStream) {
-            uploadBody = await new Response(body).arrayBuffer();
+        try {
+            if (body && typeof body.getReader === 'function') {
+                uploadBody = await new Response(body).arrayBuffer();
+            } else if (body instanceof Blob) {
+                uploadBody = await body.arrayBuffer();
+            }
+        } catch (e) {
+            console.error('Buffer Conversion Error:', e);
         }
+
         const contentType = options?.httpMetadata?.contentType || 'application/octet-stream';
-        await this.supabase.storage.from(this.bucket).upload(key, uploadBody, { upsert: true, contentType });
+        const { error } = await this.supabase.storage.from(this.bucket).upload(key, uploadBody, { upsert: true, contentType });
+        if (error) {
+            console.error("Supabase Upload Error:", error);
+            throw error;
+        }
     }
-    
+
     async delete(keyOrKeys) {
         const keys = Array.isArray(keyOrKeys) ? keyOrKeys : [keyOrKeys];
         await this.supabase.storage.from(this.bucket).remove(keys);
     }
-    
+
     async list({ prefix, delimiter, cursor }) {
         const cleanPrefix = prefix?.endsWith('/') ? prefix.slice(0, -1) : (prefix || '');
         const { data, error } = await this.supabase.storage.from(this.bucket).list(cleanPrefix, { limit: 1000 });
-        if (error || !data) return { objects: [], delimitedPrefixes: [] };
-        
+        if (error) {
+            console.error("Supabase List Error:", error);
+            throw error;
+        }
+        if (!data) return { objects: [], delimitedPrefixes: [] };
+
         const objects = [];
         const delimitedPrefixes = [];
-        
+
         for (const item of data) {
             if (item.name === '.emptyFolderPlaceholder') continue;
             if (!item.id) {
@@ -75,20 +90,20 @@ export class KVAdapter {
         const { data, error } = await this.supabase.from('kv_store').select('value').eq('id', key).single();
         if (error || !data) return null;
         if (type === 'json') {
-            try { return JSON.parse(data.value); } catch(e) { return null; }
+            try { return JSON.parse(data.value); } catch (e) { return null; }
         }
         return data.value;
     }
-    
+
     async put(key, value) {
         const strVal = typeof value === 'string' ? value : JSON.stringify(value);
         await this.supabase.from('kv_store').upsert({ id: key, value: strVal });
     }
-    
+
     async delete(key) {
         await this.supabase.from('kv_store').delete().eq('id', key);
     }
-    
+
     async list({ prefix, cursor }) {
         let query = this.supabase.from('kv_store').select('id');
         if (prefix) {

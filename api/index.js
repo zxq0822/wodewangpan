@@ -50,7 +50,7 @@ async function createJWT(payload, secret) {
   const header = { alg: 'HS256', typ: 'JWT' };
   const encodedHeader = btoa(JSON.stringify(header)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
   const encodedPayload = btoa(JSON.stringify(payload)).replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
+
   const encoder = new TextEncoder();
   const key = await crypto.subtle.importKey(
     'raw',
@@ -59,16 +59,16 @@ async function createJWT(payload, secret) {
     false,
     ['sign']
   );
-  
+
   const signature = await crypto.subtle.sign(
     'HMAC',
     key,
     encoder.encode(`${encodedHeader}.${encodedPayload}`)
   );
-  
+
   const encodedSignature = btoa(String.fromCharCode(...new Uint8Array(signature)))
     .replace(/=/g, '').replace(/\+/g, '-').replace(/\//g, '_');
-  
+
   return `${encodedHeader}.${encodedPayload}.${encodedSignature}`;
 }
 
@@ -79,9 +79,9 @@ async function verifyJWT(token, secret) {
   try {
     const parts = token.split('.');
     if (parts.length !== 3) return null;
-    
+
     const [encodedHeader, encodedPayload, encodedSignature] = parts;
-    
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -90,23 +90,23 @@ async function verifyJWT(token, secret) {
       false,
       ['verify']
     );
-    
+
     const signatureData = Uint8Array.from(atob(encodedSignature.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
-    
+
     const valid = await crypto.subtle.verify(
       'HMAC',
       key,
       signatureData,
       encoder.encode(`${encodedHeader}.${encodedPayload}`)
     );
-    
+
     if (!valid) return null;
-    
+
     const payload = JSON.parse(atob(encodedPayload.replace(/-/g, '+').replace(/_/g, '/')));
-    
+
     // Check expiration
     if (payload.exp && Date.now() > payload.exp) return null;
-    
+
     return payload;
   } catch (e) {
     return null;
@@ -177,37 +177,37 @@ function getMimeType(filename) {
  */
 function getPreviewType(filename) {
   const ext = filename.split('.').pop().toLowerCase();
-  
+
   // Image files
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'ico', 'bmp'].includes(ext)) {
     return 'image';
   }
-  
+
   // PDF files
   if (ext === 'pdf') {
     return 'pdf';
   }
-  
+
   // Text/code files
   if (['txt', 'md', 'json', 'js', 'ts', 'css', 'html', 'xml', 'yaml', 'yml', 'ini', 'conf', 'sh', 'bash', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'go', 'rs', 'sql', 'log'].includes(ext)) {
     return 'text';
   }
-  
+
   // Word documents (use Mammoth.js)
   if (ext === 'docx') {
     return 'word';
   }
-  
+
   // Video files
   if (['mp4', 'webm', 'ogg'].includes(ext)) {
     return 'video';
   }
-  
+
   // Audio files
   if (['mp3', 'wav', 'ogg', 'flac', 'm4a'].includes(ext)) {
     return 'audio';
   }
-  
+
   return null;
 }
 
@@ -260,7 +260,7 @@ async function handleLogin(request, env) {
   try {
     const body = await request.json();
     const { email, password, isAdmin } = body;
-    
+
     if (isAdmin) {
       // Admin login
       if (password === env.ADMIN_PASSWORD) {
@@ -280,24 +280,24 @@ async function handleLogin(request, env) {
       if (!email || !password) {
         return jsonResponse({ success: false, message: '请输入邮箱和密码' }, 400);
       }
-      
+
       const userData = await env.KV_STORE.get(`user:${email}`);
       if (!userData) {
         return jsonResponse({ success: false, message: '用户不存在' }, 401);
       }
-      
+
       const user = JSON.parse(userData);
       const passwordHash = await hashPassword(password);
-      
+
       if (user.passwordHash !== passwordHash) {
         return jsonResponse({ success: false, message: '密码错误' }, 401);
       }
-      
+
       const token = await createJWT(
         { email: user.email, role: 'user', exp: Date.now() + 24 * 60 * 60 * 1000 },
         env.ADMIN_PASSWORD
       );
-      
+
       return jsonResponse(
         { success: true, role: 'user', email: user.email },
         200,
@@ -320,9 +320,9 @@ async function handleLogout() {
 async function verifyAuth(request, env) {
   const cookies = parseCookies(request);
   const token = cookies.token;
-  
+
   if (!token) return null;
-  
+
   return await verifyJWT(token, env.ADMIN_PASSWORD);
 }
 
@@ -349,18 +349,18 @@ async function requireAdmin(request, env) {
 async function handleListFiles(request, env, path) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     // Normalize path
     let prefix = path || '';
     if (prefix && !prefix.endsWith('/')) prefix += '/';
     if (prefix.startsWith('/')) prefix = prefix.slice(1);
-    
+
     const listed = await env.R2_BUCKET.list({ prefix, delimiter: '/' });
-    
+
     const files = [];
     const folders = [];
-    
+
     // Process folders (common prefixes)
     if (listed.delimitedPrefixes) {
       for (const folderPath of listed.delimitedPrefixes) {
@@ -370,7 +370,7 @@ async function handleListFiles(request, env, path) {
         }
       }
     }
-    
+
     // Process files
     if (listed.objects) {
       for (const obj of listed.objects) {
@@ -388,7 +388,7 @@ async function handleListFiles(request, env, path) {
         }
       }
     }
-    
+
     return jsonResponse({ success: true, files, folders, currentPath: '/' + prefix.slice(0, -1) || '/' });
   } catch (e) {
     return jsonResponse({ success: false, message: '获取文件列表失败: ' + e.message }, 500);
@@ -398,26 +398,26 @@ async function handleListFiles(request, env, path) {
 async function handleUploadFile(request, env, path) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const formData = await request.formData();
     const file = formData.get('file');
-    
+
     if (!file) {
       return jsonResponse({ success: false, message: '没有上传文件' }, 400);
     }
-    
+
     // Normalize path
     let filePath = path || '';
     if (filePath.startsWith('/')) filePath = filePath.slice(1);
     if (filePath && !filePath.endsWith('/')) filePath += '/';
-    
+
     const key = filePath + file.name;
-    
-    await env.R2_BUCKET.put(key, file.stream(), {
+
+    await env.R2_BUCKET.put(key, await file.arrayBuffer(), {
       httpMetadata: { contentType: file.type || getMimeType(file.name) }
     });
-    
+
     return jsonResponse({ success: true, message: '文件上传成功', path: '/' + key });
   } catch (e) {
     return jsonResponse({ success: false, message: '文件上传失败: ' + e.message }, 500);
@@ -427,14 +427,14 @@ async function handleUploadFile(request, env, path) {
 async function handleDeleteFile(request, env, path) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     let key = path || '';
     if (key.startsWith('/')) key = key.slice(1);
-    
+
     // Check if it's a folder (has objects with this prefix)
     const listed = await env.R2_BUCKET.list({ prefix: key + '/', limit: 1 });
-    
+
     if (listed.objects && listed.objects.length > 0) {
       // It's a folder, delete all contents recursively
       let cursor;
@@ -446,10 +446,10 @@ async function handleDeleteFile(request, env, path) {
         cursor = batch.truncated ? batch.cursor : null;
       } while (cursor);
     }
-    
+
     // Try to delete the file itself
     await env.R2_BUCKET.delete(key);
-    
+
     return jsonResponse({ success: true, message: '删除成功' });
   } catch (e) {
     return jsonResponse({ success: false, message: '删除失败: ' + e.message }, 500);
@@ -459,35 +459,38 @@ async function handleDeleteFile(request, env, path) {
 async function handleRenameFile(request, env, path) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const body = await request.json();
     const { newName } = body;
-    
+
     if (!newName) {
       return jsonResponse({ success: false, message: '请提供新名称' }, 400);
     }
-    
+
     let oldKey = path || '';
     if (oldKey.startsWith('/')) oldKey = oldKey.slice(1);
-    
+
     const parentPath = oldKey.includes('/') ? oldKey.substring(0, oldKey.lastIndexOf('/') + 1) : '';
     const newKey = parentPath + newName;
-    
+
     // Get the old file
     const oldObject = await env.R2_BUCKET.get(oldKey);
     if (!oldObject) {
       return jsonResponse({ success: false, message: '文件不存在' }, 404);
     }
-    
+
     // Copy to new location
-    await env.R2_BUCKET.put(newKey, oldObject.body, {
+    let newBody = oldObject.body;
+    if (newBody instanceof Blob) newBody = await newBody.arrayBuffer();
+
+    await env.R2_BUCKET.put(newKey, newBody, {
       httpMetadata: oldObject.httpMetadata
     });
-    
+
     // Delete old file
     await env.R2_BUCKET.delete(oldKey);
-    
+
     return jsonResponse({ success: true, message: '重命名成功', newPath: '/' + newKey });
   } catch (e) {
     return jsonResponse({ success: false, message: '重命名失败: ' + e.message }, 500);
@@ -497,21 +500,21 @@ async function handleRenameFile(request, env, path) {
 async function handleCreateFolder(request, env) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const body = await request.json();
     let { path: folderPath } = body;
-    
+
     if (!folderPath) {
       return jsonResponse({ success: false, message: '请提供文件夹路径' }, 400);
     }
-    
+
     if (folderPath.startsWith('/')) folderPath = folderPath.slice(1);
     if (!folderPath.endsWith('/')) folderPath += '/';
-    
+
     // Create an empty placeholder file to represent the folder
     await env.R2_BUCKET.put(folderPath + '.folder', new Uint8Array(0));
-    
+
     return jsonResponse({ success: true, message: '文件夹创建成功', path: '/' + folderPath.slice(0, -1) });
   } catch (e) {
     return jsonResponse({ success: false, message: '创建文件夹失败: ' + e.message }, 500);
@@ -523,18 +526,18 @@ async function handleDownloadFile(request, env, path) {
   if (!auth) {
     return jsonResponse({ success: false, message: '未授权' }, 401);
   }
-  
+
   try {
     let key = path || '';
     if (key.startsWith('/')) key = key.slice(1);
-    
+
     const object = await env.R2_BUCKET.get(key);
     if (!object) {
       return jsonResponse({ success: false, message: '文件不存在' }, 404);
     }
-    
+
     const filename = key.split('/').pop();
-    
+
     return new Response(object.body, {
       headers: {
         'Content-Type': object.httpMetadata?.contentType || getMimeType(filename),
@@ -553,19 +556,19 @@ async function handlePreviewFile(request, env, path) {
   if (!auth) {
     return jsonResponse({ success: false, message: '未授权' }, 401);
   }
-  
+
   try {
     let key = path || '';
     if (key.startsWith('/')) key = key.slice(1);
-    
+
     const object = await env.R2_BUCKET.get(key);
     if (!object) {
       return jsonResponse({ success: false, message: '文件不存在' }, 404);
     }
-    
+
     const filename = key.split('/').pop();
     const contentType = object.httpMetadata?.contentType || getMimeType(filename);
-    
+
     return new Response(object.body, {
       headers: {
         'Content-Type': contentType,
@@ -585,24 +588,24 @@ async function handlePreviewFile(request, env, path) {
 async function handleCreateShare(request, env) {
   const auth = await requireAuth(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const body = await request.json();
     const { filePath, password, expiresIn } = body;
-    
+
     if (!filePath) {
       return jsonResponse({ success: false, message: '请提供文件路径' }, 400);
     }
-    
+
     // Verify file exists
     let key = filePath;
     if (key.startsWith('/')) key = key.slice(1);
-    
+
     const object = await env.R2_BUCKET.head(key);
     if (!object) {
       return jsonResponse({ success: false, message: '文件不存在' }, 404);
     }
-    
+
     const shareId = generateId(12);
     const shareData = {
       shareId,
@@ -615,13 +618,13 @@ async function handleCreateShare(request, env) {
       downloadCount: 0,
       createdAt: Date.now()
     };
-    
+
     await env.KV_STORE.put(`share:${shareId}`, JSON.stringify(shareData));
-    
+
     // Update stats
     const totalShares = parseInt(await env.KV_STORE.get('stats:totalShares') || '0');
     await env.KV_STORE.put('stats:totalShares', String(totalShares + 1));
-    
+
     return jsonResponse({
       success: true,
       shareId,
@@ -638,22 +641,22 @@ async function handleGetShareInfo(request, env, shareId) {
     if (!shareData) {
       return jsonResponse({ success: false, message: '分享链接不存在' }, 404);
     }
-    
+
     const share = JSON.parse(shareData);
-    
+
     // Check expiration
     if (share.expiresAt && Date.now() > share.expiresAt) {
       return jsonResponse({ success: false, message: '分享链接已过期' }, 410);
     }
-    
+
     // Update view count
     share.viewCount++;
     await env.KV_STORE.put(`share:${shareId}`, JSON.stringify(share));
-    
+
     // Update global stats
     const totalViews = parseInt(await env.KV_STORE.get('stats:totalViews') || '0');
     await env.KV_STORE.put('stats:totalViews', String(totalViews + 1));
-    
+
     return jsonResponse({
       success: true,
       fileName: share.fileName,
@@ -673,43 +676,43 @@ async function handleShareDownload(request, env, shareId) {
     if (!shareData) {
       return jsonResponse({ success: false, message: '分享链接不存在' }, 404);
     }
-    
+
     const share = JSON.parse(shareData);
-    
+
     // Check expiration
     if (share.expiresAt && Date.now() > share.expiresAt) {
       return jsonResponse({ success: false, message: '分享链接已过期' }, 410);
     }
-    
+
     // Check password
     if (share.passwordHash) {
       const body = await request.json();
       const { password } = body;
-      
+
       if (!password) {
         return jsonResponse({ success: false, message: '请输入密码' }, 401);
       }
-      
+
       const passwordHash = await hashPassword(password);
       if (passwordHash !== share.passwordHash) {
         return jsonResponse({ success: false, message: '密码错误' }, 401);
       }
     }
-    
+
     // Get file from R2
     const object = await env.R2_BUCKET.get(share.filePath);
     if (!object) {
       return jsonResponse({ success: false, message: '文件不存在' }, 404);
     }
-    
+
     // Update download count
     share.downloadCount++;
     await env.KV_STORE.put(`share:${shareId}`, JSON.stringify(share));
-    
+
     // Update global stats
     const totalDownloads = parseInt(await env.KV_STORE.get('stats:totalDownloads') || '0');
     await env.KV_STORE.put('stats:totalDownloads', String(totalDownloads + 1));
-    
+
     return new Response(object.body, {
       headers: {
         'Content-Type': object.httpMetadata?.contentType || getMimeType(share.fileName),
@@ -729,12 +732,12 @@ async function handleShareDownload(request, env, shareId) {
 async function handleGetStats(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const totalShares = parseInt(await env.KV_STORE.get('stats:totalShares') || '0');
     const totalViews = parseInt(await env.KV_STORE.get('stats:totalViews') || '0');
     const totalDownloads = parseInt(await env.KV_STORE.get('stats:totalDownloads') || '0');
-    
+
     return jsonResponse({
       success: true,
       totalShares,
@@ -749,11 +752,11 @@ async function handleGetStats(request, env) {
 async function handleListShares(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const shares = [];
     let cursor;
-    
+
     do {
       const listed = await env.KV_STORE.list({ prefix: 'share:', cursor });
       for (const key of listed.keys) {
@@ -769,10 +772,10 @@ async function handleListShares(request, env) {
       }
       cursor = listed.list_complete ? null : listed.cursor;
     } while (cursor);
-    
+
     // Sort by creation date, newest first
     shares.sort((a, b) => b.createdAt - a.createdAt);
-    
+
     return jsonResponse({ success: true, shares });
   } catch (e) {
     return jsonResponse({ success: false, message: '获取分享列表失败: ' + e.message }, 500);
@@ -782,16 +785,16 @@ async function handleListShares(request, env) {
 async function handleDeleteShare(request, env, shareId) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     await env.KV_STORE.delete(`share:${shareId}`);
-    
+
     // Update stats
     const totalShares = parseInt(await env.KV_STORE.get('stats:totalShares') || '0');
     if (totalShares > 0) {
       await env.KV_STORE.put('stats:totalShares', String(totalShares - 1));
     }
-    
+
     return jsonResponse({ success: true, message: '分享链接已删除' });
   } catch (e) {
     return jsonResponse({ success: false, message: '删除分享链接失败: ' + e.message }, 500);
@@ -801,11 +804,11 @@ async function handleDeleteShare(request, env, shareId) {
 async function handleListUsers(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const users = [];
     let cursor;
-    
+
     do {
       const listed = await env.KV_STORE.list({ prefix: 'user:', cursor });
       for (const key of listed.keys) {
@@ -821,7 +824,7 @@ async function handleListUsers(request, env) {
       }
       cursor = listed.list_complete ? null : listed.cursor;
     } while (cursor);
-    
+
     return jsonResponse({ success: true, users });
   } catch (e) {
     return jsonResponse({ success: false, message: '获取用户列表失败: ' + e.message }, 500);
@@ -831,30 +834,30 @@ async function handleListUsers(request, env) {
 async function handleCreateUser(request, env) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const body = await request.json();
     const { email, password } = body;
-    
+
     if (!email || !password) {
       return jsonResponse({ success: false, message: '请提供邮箱和密码' }, 400);
     }
-    
+
     // Check if user already exists
     const existing = await env.KV_STORE.get(`user:${email}`);
     if (existing) {
       return jsonResponse({ success: false, message: '用户已存在' }, 409);
     }
-    
+
     const userData = {
       email,
       passwordHash: await hashPassword(password),
       role: 'user',
       createdAt: Date.now()
     };
-    
+
     await env.KV_STORE.put(`user:${email}`, JSON.stringify(userData));
-    
+
     return jsonResponse({ success: true, message: '用户创建成功', email });
   } catch (e) {
     return jsonResponse({ success: false, message: '创建用户失败: ' + e.message }, 500);
@@ -864,11 +867,11 @@ async function handleCreateUser(request, env) {
 async function handleDeleteUser(request, env, email) {
   const auth = await requireAdmin(request, env);
   if (auth instanceof Response) return auth;
-  
+
   try {
     const decodedEmail = decodeURIComponent(email);
     await env.KV_STORE.delete(`user:${decodedEmail}`);
-    
+
     return jsonResponse({ success: true, message: '用户已删除' });
   } catch (e) {
     return jsonResponse({ success: false, message: '删除用户失败: ' + e.message }, 500);
@@ -3030,36 +3033,36 @@ const SHARE_PAGE = `
 export const config = { runtime: 'edge' };
 
 export default async function handler(request) {
-    const env = {
-        ...process.env,
-        R2_BUCKET: new R2Adapter(),
-        KV_STORE: new KVAdapter()
-    };
-    
-    const ctx = {
-        waitUntil: (promise) => {
-            // Vercel Edge logic gracefully ignores or supports pass-through
-        }
-    };
+  const env = {
+    ...process.env,
+    R2_BUCKET: new R2Adapter(),
+    KV_STORE: new KVAdapter()
+  };
 
-    try {
+  const ctx = {
+    waitUntil: (promise) => {
+      // Vercel Edge logic gracefully ignores or supports pass-through
+    }
+  };
+
+  try {
 
     const url = new URL(request.url);
     const path = url.pathname;
     const method = request.method;
-    
+
     // CORS headers for API requests
     const corsHeaders = {
       'Access-Control-Allow-Origin': '*',
       'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
       'Access-Control-Allow-Headers': 'Content-Type'
     };
-    
+
     // Handle CORS preflight
     if (method === 'OPTIONS') {
       return new Response(null, { headers: corsHeaders });
     }
-    
+
     try {
       // API Routes
       if (path.startsWith('/api/')) {
@@ -3067,19 +3070,19 @@ export default async function handler(request) {
         if (path === '/api/login' && method === 'POST') {
           return await handleLogin(request, env);
         }
-        
+
         if (path === '/api/logout' && method === 'POST') {
           return await handleLogout();
         }
-        
+
         if (path === '/api/auth/check') {
           return await handleCheckAuth(request, env);
         }
-        
+
         // File management routes
         if (path.startsWith('/api/files')) {
           const filePath = path.slice('/api/files'.length) || '/';
-          
+
           if (method === 'GET') {
             return await handleListFiles(request, env, filePath);
           }
@@ -3093,79 +3096,79 @@ export default async function handler(request) {
             return await handleDeleteFile(request, env, filePath);
           }
         }
-        
+
         // Folder creation
         if (path === '/api/folders' && method === 'POST') {
           return await handleCreateFolder(request, env);
         }
-        
+
         // Download route
         if (path.startsWith('/api/download')) {
           const filePath = path.slice('/api/download'.length);
           return await handleDownloadFile(request, env, filePath);
         }
-        
+
         // Preview route
         if (path.startsWith('/api/preview')) {
           const filePath = path.slice('/api/preview'.length);
           return await handlePreviewFile(request, env, filePath);
         }
-        
+
         // Share routes
         if (path === '/api/share' && method === 'POST') {
           return await handleCreateShare(request, env);
         }
-        
+
         if (path.match(/^\/api\/share\/[^/]+$/) && method === 'GET') {
           const shareId = path.split('/').pop();
           return await handleGetShareInfo(request, env, shareId);
         }
-        
+
         if (path.match(/^\/api\/share\/[^/]+\/download$/) && method === 'POST') {
           const shareId = path.split('/')[3];
           return await handleShareDownload(request, env, shareId);
         }
-        
+
         // Admin routes
         if (path === '/api/admin/stats' && method === 'GET') {
           return await handleGetStats(request, env);
         }
-        
+
         if (path === '/api/admin/shares' && method === 'GET') {
           return await handleListShares(request, env);
         }
-        
+
         if (path.match(/^\/api\/admin\/shares\/[^/]+$/) && method === 'DELETE') {
           const shareId = path.split('/').pop();
           return await handleDeleteShare(request, env, shareId);
         }
-        
+
         if (path === '/api/admin/users' && method === 'GET') {
           return await handleListUsers(request, env);
         }
-        
+
         if (path === '/api/admin/users' && method === 'POST') {
           return await handleCreateUser(request, env);
         }
-        
+
         if (path.match(/^\/api\/admin\/users\/[^/]+$/) && method === 'DELETE') {
           const email = path.split('/').pop();
           return await handleDeleteUser(request, env, email);
         }
-        
+
         return jsonResponse({ success: false, message: 'API 路径不存在' }, 404);
       }
-      
+
       // Share page route
       if (path.startsWith('/s/')) {
         return htmlResponse(SHARE_PAGE);
       }
-      
+
       // Static page routes
       if (path === '/login.html' || path === '/login') {
         return htmlResponse(LOGIN_PAGE);
       }
-      
+
       if (path === '/admin.html' || path === '/admin') {
         // Check if user is admin
         const auth = await verifyAuth(request, env);
@@ -3174,7 +3177,7 @@ export default async function handler(request) {
         }
         return htmlResponse(ADMIN_PAGE);
       }
-      
+
       // Root and index - check auth
       if (path === '/' || path === '/index.html') {
         const auth = await verifyAuth(request, env);
@@ -3183,20 +3186,20 @@ export default async function handler(request) {
         }
         return htmlResponse(INDEX_PAGE);
       }
-      
+
       // Default: redirect to root
       return Response.redirect(url.origin + '/', 302);
-      
+
     } catch (error) {
       console.error('Error:', error);
       return jsonResponse({ success: false, message: '服务器错误: ' + error.message }, 500);
     }
-  
-    } catch (e) {
-        console.error("Vercel Runtime Error:", e);
-        return new Response(JSON.stringify({ success: false, message: 'Server Error: ' + e.message }), { 
-            status: 500,
-            headers: { 'Content-Type': 'application/json' }
-        });
-    }
+
+  } catch (e) {
+    console.error("Vercel Runtime Error:", e);
+    return new Response(JSON.stringify({ success: false, message: 'Server Error: ' + e.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 }
