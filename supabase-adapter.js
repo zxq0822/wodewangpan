@@ -59,7 +59,17 @@ export class R2Adapter {
 
     async list({ prefix, delimiter, cursor }) {
         const cleanPrefix = prefix?.endsWith('/') ? prefix.slice(0, -1) : (prefix || '');
-        const { data, error } = await this.supabase.storage.from(this.bucket).list(cleanPrefix, { limit: 1000 });
+
+        let promise;
+        if (!cleanPrefix) {
+            // Retrieve root directory
+            promise = this.supabase.storage.from(this.bucket).list();
+        } else {
+            promise = this.supabase.storage.from(this.bucket).list(cleanPrefix, { limit: 1000 });
+        }
+
+        const { data, error } = await promise;
+
         if (error) {
             console.error("Supabase List Error:", error);
             throw error;
